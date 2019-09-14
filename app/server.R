@@ -3,7 +3,7 @@
 # ######################################################
 
 #specify the packages of interest
-packages = c("shiny","shinydashboard","shinycssloaders","DT", "quantmod" , "ggplot2" , "forecast", "randomForest", "e1071","nnet","readr", "dplyr")
+packages = c("shiny","shinydashboard","shinycssloaders","DT", "quantmod" , "ggplot2" , "forecast", "randomForest", "e1071","nnet","readr", "dplyr","bigrquery")
 
 #use this function to check if each package is on the local machine
 #if a package is installed, it will be loaded
@@ -63,21 +63,21 @@ shinyServer(function(input, output, session) {
   getDataExplor <- reactive({
     
     
-    Stock_df <- prepareData()
+    show_data <- prepareData()
     
 
     
     if (input$show == "THIS IS US") {
       
       
-      show_data <- subset(joined_data, joined_data$series == input$show)
+      show_data <- subset(show_data, show_data$series == input$show)
       
       
 
     } else if (input$model == "To Be Added Later") {
       
      
-      show_data <- subset(joined_data, joined_data$series == input$show)
+      show_data <- subset(show_data, show_data$series == input$show)
       
 
     }
