@@ -37,8 +37,8 @@ Shinyui <- fluidPage(
                   ),
                   tabPanel("Prediction Model", 
                            tags$br(),
-                           tags$p("The graphs below show our prediction attepmts."),
-                           shinycssloaders::withSpinner(DT::dataTableOutput("table1"))
+                           tags$p("The graphs below show our prediction Neural Network.  Neural Network (or Artificial Neural Network) has the ability to learn by examples. ANN is an information processing model inspired by the biological neuron system. It is composed of a large number of highly interconnected processing elements known as the neuron to solve problems. It follows the non-linear path and process information in parallel throughout the nodes. A neural network is a complex adaptive system. Adaptive means it has the ability to change its internal structure by adjusting weights of inputs."),
+                           shinycssloaders::withSpinner(plotOutput("graph3"))
                   )
       ),
       tags$head(tags$script(src="https://cdn.datatables.net/rowgroup/1.1.0/js/dataTables.rowGroup.min.js"))

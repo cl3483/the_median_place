@@ -3,7 +3,9 @@
 # ######################################################
 
 #specify the packages of interest
-packages = c("shiny","shinydashboard","shinycssloaders","DT", "quantmod" , "ggplot2" , "forecast", "randomForest", "e1071","nnet","readr", "dplyr","bigrquery")
+packages = c("shiny","shinydashboard","shinycssloaders","DT", 
+             "quantmod" , "ggplot2" , "forecast", "randomForest", 
+             "e1071","nnet","readr", "dplyr","bigrquery")
 
 #use this function to check if each package is on the local machine
 #if a package is installed, it will be loaded
@@ -33,7 +35,7 @@ shinyServer(function(input, output, session) {
 
   # ######################################################
   # Prepare the data for the modeling process
-  # Chris, drop your code in this section, if needed.
+  # 
   # ######################################################
   
   prepareData <- reactive({
@@ -47,7 +49,7 @@ shinyServer(function(input, output, session) {
     # Execute the query and store the result
     show_data <- query_exec(sql, project = project, useLegacySql = FALSE)
     
-    show_data$season_number <- as.factor(show_data$season_number)
+    show_data$season_number_factored <- as.factor(show_data$season_number)
     
     return(show_data)
     
@@ -56,8 +58,8 @@ shinyServer(function(input, output, session) {
   
  
   # ######################################################
-  # Model the data and return the prices
-  # Chris, drop your code in this section.
+  # 
+  # 
   # ######################################################
   
   getDataExplor <- reactive({
@@ -90,13 +92,53 @@ shinyServer(function(input, output, session) {
 
 
   
-  
+  getPredict <- reactive({
+    
+    
+    show_data <- prepareData()
+    
+    daystopredict <- 1:30
+    
+    
+    if (input$show == "THIS IS US") {
+      
+      
+      #show_data <- subset(show_data, show_data$series == input$show)
+      
+      daystopredict <- 1:30
+      #show_data <- subset(show_data, show_data$series == "THIS IS US")
+      
+      show_data2 <- show_data[, c("average_length","season_number","episode_number","Imps")]
+      
+      # fit <- randomForest(average_length ~ . ,data=show_data2)
+      
+      fit <- nnet(average_length ~ . ,data=show_data2, size = 10 ,decay = .01 ,maxit = 1000, linout = TRUE, trace = FALSE )
+      
+      
+      fit.predict <- predict(fit, newdata=data.frame(average_length = daystopredict,
+                                                     season_number = daystopredict,
+                                                     episode_number = daystopredict,
+                                                     Imps = daystopredict))
+      
+      
+      
+    } else if (input$show == "To Be Added Later") {
+      
+      
+      
+      
+      
+    }
+    
+    
+    return(fit.predict)
+    
+  })
   
   
   
   # ######################################################
   # Render Plot for stock prices
-  # Erik, drop your code in this section.
   # ######################################################     
   
   output$graph1 <- renderPlot({
@@ -110,13 +152,16 @@ shinyServer(function(input, output, session) {
   output$graph2 <- renderPlot({
     results <- getDataExplor()
     library(ggplot2)
-    ggplot(data=results, aes(x=episode_number, y=average_length, group=season_number)) +
-      geom_line(aes(color=season_number))+
-      geom_point(aes(color=season_number))+ 
+    ggplot(data=results, aes(x=episode_number, y=average_length, group=season_number_factored)) +
+      geom_line(aes(color=season_number_factored ))+
+      geom_point(aes(color=season_number_factored ))+ 
       theme(legend.position="bottom")
   }) 
   
+  output$graph3 <- renderPlot({
+    results <-  getPredict()
+    plot(results)
+  }) 
+  
+  
 })
-  
-  
-  
