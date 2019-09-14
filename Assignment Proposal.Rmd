@@ -1,0 +1,165 @@
+---
+title: "Data Mining in R - Assignment Proposal"
+author: "Courtney McCarthy, Natalia Fadeeva, Jerone Kadner, Chris Lattanzio, Ben Haimowitz"
+date: "August 26, 2019"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+
+```
+###Goal of Capstone
+
+We are trying to predict the amount of linear viewers for a future time period for a given show. This will then help us to predict the amount of digital viewers for a show as well. We would like to use Time Series Models that we learned in class. 
+
+###Proposal for Capstone
+  - We would try a time series regression using all of the different time windows that were taught to us in class. These would be: 
+    - Fixed Window; learn test strategies for time series, the training set keeps growing
+    - Growing Window: every test cases a new model to be obtained using all data available till then 
+    - Sliding Window: We would try to incorporate new data as time goes by, the old data is getting used over and over again. 
+    
+  - We would then try each window with two different regression models. 
+    - SVM
+    - Multivariate Adaptive Regression
+
+  - We would then like to use the Monte Carolo Simulation to select the model that we would ultimately use between the three different time windows.We are aware that we cannot us 
+    - 2 years for training data by series, 2016 and 2017. 
+    - 1 year for evaluation by series, 2018.
+  
+By using same model being learned, but applied to the test set in different ways
+
+```{r Checking for packages}
+
+# Loading the Packages
+# Specifying the packages of interest
+packages = c("readxl","lubridate","Hmisc","DMwR2","dplyr")
+
+package.check <- lapply(packages, FUN = function(x) {
+  if (!require(x, character.only = TRUE)) {
+    install.packages(x, dependencies = TRUE)
+    library(x, character.only = TRUE)
+  }
+})
+
+# Verifying the packages got loaded or not
+cat("\nThe Loaded Packages in this environment are:\n")
+search()
+
+```
+
+```{r Packages}
+#Loading Libraries to use in the analysis  
+library(readxl) #this will read the excel files for us
+library(lubridate) #this will help change the dates into the correct date format
+library(Hmisc)
+library(DMwR2)
+library(dplyr) #this will allow summary statistics 
+```
+
+```{r Inserting linear data}
+
+
+Nielsen_Data_All=read_excel("Nielsen Data.xlsx",sheet = "Report 1")
+colnames(Nielsen_Data_All)[10] <- "viewers"
+Nielsen_Data <-  Nielsen_Data_All %>% select(Date, viewers) %>%   filter(Nielsen_Data_All$`Show Name` == "SUPERSTORE")
+Nielsen_Data <- tibble(date = Nielsen_Data$Date, viewers = Nielsen_Data$viewers) 
+
+
+
+```
+
+```{r}
+
+
+count_ts = ts(Nielsen_Data[, c('x')])
+
+Nielsen_Data$clean_cnt = tsclean(count_ts)
+
+ggplot() +
+  geom_line(data = Nielsen_Data, aes(x = date, y = clean_cnt))
+```
+
+
+
+```{r}
+
+Nielsen_Data$cnt_ma = ma(Nielsen_Data$clean_cnt, order=7) # using the clean count with no outliers
+Nielsen_Data$cnt_ma30 = ma(Nielsen_Data$clean_cnt, order=30)
+
+
+ggplot() +
+  geom_line(data = Nielsen_Data, aes(x = date, y = clean_cnt, colour = "Counts")) +
+  geom_line(data = Nielsen_Data, aes(x = date, y = cnt_ma,   colour = "Weekly Moving Average"))  +
+  geom_line(data = Nielsen_Data, aes(x = date, y = cnt_ma30, colour = "Monthly Moving Average"))  +
+  ylab('Crime counts')
+
+```
+
+```{r}
+count_ma = ts(na.omit(Nielsen_Data$cnt_ma), frequency=7)
+decomp = stl(count_ma, s.window="periodic")
+
+deseasonal_cnt <- seasadj(decomp)
+
+fit_w_seasonality = auto.arima(deseasonal_cnt, seasonal=TRUE)
+fit_w_seasonality
+
+seas_fcast <- forecast(fit_w_seasonality, h=30)
+plot(seas_fcast)
+
+
+
+```
+
+
+
+
+```{r}
+
+rownames(Nielsen_Data) <- Nielsen_Data$date
+Nielsen_Data <- select (Nielsen_Data,-c(date))
+
+
+```
+
+
+```{r}
+
+library(performanceEstimation)
+library(e1071)
+
+## ----size="scriptsize", tidy=FALSE, message=FALSE, warning=FALSE---------
+
+ 
+Tdata.train <- na.omit( as.data.frame(modelData(Nielsen_Data[1:40,])))
+Tdata.eval <- na.omit( as.data.frame(modelData(Nielsen_Data[41:59,])))
+Tform <- as.formula('viewers ~ .')  # the formula to be used in models
+
+
+exp <- performanceEstimation(
+    PredTask(Tform, Tdata.train, 'Super Store'),   
+    c(Workflow('standardWF', wfID="standSVM",
+               learner='svm',learner.pars=list(cost=10,gamma=0.01)),
+      Workflow('timeseriesWF', wfID="slideSVM", # creates a sliding or growing timeseries window
+               type="slide", relearn.step=90, # 90 days slide
+               learner='svm',learner.pars=list(cost=10,gamma=0.01)),
+      Workflow('timeseriesWF', wfID="fixedSVM", # creates a sliding or growing timeseries window
+               type="fixed", relearn.step=90, # 90 days slide
+               learner='svm',learner.pars=list(cost=10,gamma=0.01)),
+      Workflow('timeseriesWF', wfID="growSVM", # creates a sliding or growing timeseries window
+               type="growing", relearn.step=90, # 90 days slide
+               learner='svm',learner.pars=list(cost=10,gamma=0.01))
+      ),
+    EstimationTask(metrics="theil", # Close to zero as possible.  Estimate of errors to base line (previous model)
+                   method=MonteCarlo(nReps=10,szTrain=0.5,szTest=0.25)))
+
+## ----size="tiny",cache=FALSE---------------------------------------------
+summary(exp)   
+
+## ----size="scriptsize",fig.width=8,fig.height=8,out.width="0.5\\textwidth",cache=FALSE----
+plot(exp)   
+
+
+```
+
