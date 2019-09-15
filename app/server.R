@@ -47,7 +47,8 @@ shinyServer(function(input, output, session) {
   # ######################################################
   
   updateSelectInput(session = session, inputId = "show", selected ="THIS IS US")
-
+  updateSelectInput(session = session, inputId = "model", selected ="SVM")
+  
   # ######################################################
   # Prepare the data for the modeling process
   # 
@@ -105,7 +106,13 @@ shinyServer(function(input, output, session) {
 
   })
 
-
+  prepareText <- reactive({
+    
+    model_desc <- read_csv("model_desc.csv")
+    
+    return(model_desc)
+    
+  })
   
   getPredict <- reactive({
     
@@ -116,7 +123,7 @@ shinyServer(function(input, output, session) {
     
     
     if (input$show == "THIS IS US") {
-      
+      set.seed(1234)
       
       #show_data <- subset(show_data, show_data$series == input$show)
       
@@ -124,11 +131,26 @@ shinyServer(function(input, output, session) {
       #show_data <- subset(show_data, show_data$series == "THIS IS US")
       
       show_data2 <- show_data[, c("average_length","season_number","episode_number","Imps")]
+
+      getModel <- reactive({
+        
+      if (input$model == "SVM") {
+        fit <- svm(average_length ~ . ,data=show_data2,cost=5,gamma=0.01, epsilon=0.1)
+        
+       } else if (input$model == "Random Forest") {  
+       fit <- randomForest(average_length ~ . ,data=show_data2)
+       
+       } else if (input$model == "Neural Network") {  
       
-      # fit <- randomForest(average_length ~ . ,data=show_data2)
+       fit <- nnet(average_length ~ . ,data=show_data2, size = 10 ,decay = .01 ,maxit = 1000, linout = TRUE, trace = FALSE )
       
-      fit <- nnet(average_length ~ . ,data=show_data2, size = 10 ,decay = .01 ,maxit = 1000, linout = TRUE, trace = FALSE )
+       }
       
+      return(fit)
+      
+      })
+      
+      fit <-  getModel()
       
       fit.predict <- predict(fit, newdata=data.frame(average_length = daystopredict,
                                                      season_number = daystopredict,
@@ -180,7 +202,13 @@ shinyServer(function(input, output, session) {
   output$graph3 <- renderPlot({
     results <-  getPredict()
     plot(results)
-  }) 
+  })
+  
+  output$desc <- renderText({
+    model_desc <- prepareText()
+    filter(model_desc, model_desc$model == input$model) %>% pull(desc)
+    
+  })
   
   
 })
