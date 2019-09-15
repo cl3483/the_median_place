@@ -20,6 +20,21 @@ package.check <- lapply(packages, FUN = function(x) {
 #verify they are loaded
 search()
 
+## function to plot a regression graph
+
+ggplotRegression <- function (fit) {
+  
+  require(ggplot2)
+  
+  ggplot(fit$model, aes_string(x = names(fit$model)[2], y = names(fit$model)[1])) + 
+    geom_point() +
+    stat_smooth(method = "lm", col = "red") +
+    labs(title = paste("Adj R2 = ",signif(summary(fit)$adj.r.squared, 5),
+                       "Intercept =",signif(fit$coef[[1]],5 ),
+                       " Slope =",signif(fit$coef[[2]], 5),
+                       " P =",signif(summary(fit)$coef[2,4], 5)))
+}
+
 
 # Define server logic required to draw a graph and table
 
@@ -58,7 +73,7 @@ shinyServer(function(input, output, session) {
   
  
   # ######################################################
-  # 
+  # Graphing Sections
   # 
   # ######################################################
   
@@ -128,6 +143,7 @@ shinyServer(function(input, output, session) {
       
       
       
+      
     }
     
     
@@ -142,10 +158,13 @@ shinyServer(function(input, output, session) {
   # ######################################################     
   
   output$graph1 <- renderPlot({
-    results <- getDataExplor()
+        results <- getDataExplor()
     library(ggplot2)
-    ggplot(results, aes(x = average_length, y = Imps)) +
-      geom_point()
+    fit <- lm(average_length ~ Imps, data = results)
+   # ggplot(results, aes(x = average_length, y = Imps)) +
+    #  geom_point() + stat_summary(fun.data=mean_cl_normal) + 
+     # geom_smooth(method='lm') + 
+    ggplotRegression(fit)
   })
   
 
@@ -155,7 +174,7 @@ shinyServer(function(input, output, session) {
     ggplot(data=results, aes(x=episode_number, y=average_length, group=season_number_factored)) +
       geom_line(aes(color=season_number_factored ))+
       geom_point(aes(color=season_number_factored ))+ 
-      theme(legend.position="bottom")
+      theme(legend.position="top")
   }) 
   
   output$graph3 <- renderPlot({
