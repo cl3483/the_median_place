@@ -1,5 +1,5 @@
 ---
-title: "This is Us Analysis"
+title: "Data Driven Decision Making - Post Module Assignment Analysis"
 author: "Natalia Fadeeva"
 date: "9/14/2019"
 output: html_document
