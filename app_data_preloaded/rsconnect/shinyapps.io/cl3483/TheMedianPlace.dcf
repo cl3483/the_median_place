@@ -5,9 +5,9 @@ account: cl3483
 server: shinyapps.io
 hostUrl: https://api.shinyapps.io/v1
 appId: 1202441
-bundleId: 2418734
+bundleId: 2422062
 url: https://cl3483.shinyapps.io/themedianplace/
-when: 1568677900.46666
+when: 1568758757.98511
 asMultiple: FALSE
 asStatic: FALSE
 ignoredFiles: Model_Choice.Rmd

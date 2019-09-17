@@ -208,8 +208,15 @@ shinyServer(function(input, output, session) {
   }) 
   
   output$graph3 <- renderPlot({
-    results <-  getPredict()
-    plot(results)
+    results <- as.data.frame(getPredict())
+    names(results)[1] <- "AVs"
+    results$AVs <- paste(format(round(results$AVs / 1e6, 1), trim = TRUE), "M")
+    results$Day <- paste0('D',as.integer(rownames(results)))
+    results$Day <- factor(results$Day, levels = c("D1", "D2", "D3", "D4", "D5", "D6", "D7", "D8", "D9", "D10",
+                                                  "D11", "D12", "D13", "D14", "D15", "D16", "D17", "D18", "D19", "D20",
+                                                  "D21", "D22", "D23", "D24", "D25", "D26", "D27", "D28", "D29", "D30"))
+    ggplot(results, aes(x=results$Day, y=results$AVs)) +geom_point(color='black', size=3) +xlab("Predicted Day") + ylab("Predicted Average Viewing")
+    
   })
   
   output$graph4 <- renderPlot({
