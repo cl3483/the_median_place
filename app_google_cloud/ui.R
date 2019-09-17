@@ -4,9 +4,12 @@
 
 Shinyui <- fluidPage(
   
+
+  
   
   # Application title
   headerPanel("The Median Place - Assignemnt"),
+
   
   # Sidebar with a slider inputs for number of predicted days, Variables for stock and model choices
   
@@ -41,6 +44,12 @@ Shinyui <- fluidPage(
                            shinycssloaders::withSpinner(plotOutput("graph1")),
                            shinycssloaders::withSpinner(plotOutput("graph2"))
                            
+                           
+                  ),
+                  tabPanel("Exploratory Data Analysis - Outliers", 
+                           tags$br(),
+                           tags$p("The graphs below show our data around outliers.  We will remove outliers before we run our predictions"),
+                           shinycssloaders::withSpinner(plotOutput("graph4"))                        
                            
                   ),
                   tabPanel("Prediction Model", 

@@ -1,0 +1,129 @@
+---
+title: "Untitled"
+author: "Chris Lattanzio"
+date: "9/14/2019"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+
+
+packages = c("shiny","shinydashboard","shinycssloaders","DT", 
+             "quantmod" , "ggplot2" , "forecast", "randomForest", 
+             "e1071","nnet","readr", "dplyr","bigrquery")
+
+#use this function to check if each package is on the local machine
+#if a package is installed, it will be loaded
+#if any are not, the missing package(s) will be installed and loaded
+package.check <- lapply(packages, FUN = function(x) {
+  if (!require(x, character.only = TRUE)) {
+    install.packages(x, dependencies = TRUE)
+    library(x, character.only = TRUE)
+  }
+})
+
+#verify they are loaded
+search()
+
+```
+
+
+```{r}
+ # install.packages('devtools') devtools::install_github("rstats-db/bigrquery")
+    # Use your project ID here
+    project <- "capstone-247602" # put your project ID here
+    # Example query - select copies of files with content containing "TODO"
+    sql <- "SELECT * FROM [combined_digital_linear.tbl_Joined_By_Series_Name_And_AirDate]"
+    # Execute the query and store the result
+    show_data <- query_exec(sql, project = project, useLegacySql = FALSE)
+    
+    #show_data$season_number <- as.factor(show_data$season_number)
+
+
+```
+
+
+```{r}
+
+daystopredict <- 1:30
+show_data <- subset(show_data, show_data$series == "THIS IS US")
+
+show_data2 <- show_data[, c("average_length","Median_Income","Median_Age","Imps")]
+
+show_data3 <- show_data[, c("airdate","average_length","Median_Income","Median_Age","Imps")]
+
+show_date3 <- as.xts(show_data3)
+      
+     # fit <- randomForest(average_length ~ . ,data=show_data2)
+
+      
+      fit <- nnet(average_length ~ . ,data=show_data2, size = 10 ,decay = .01 ,maxit = 1000, linout = TRUE, trace = FALSE )
+      
+
+     
+      
+      fit.predict <- predict(fit, newdata=data.frame(average_length = daystopredict,
+                                                     Median_Income = daystopredict,
+                                                     Median_Age = daystopredict,
+                                                     Imps = daystopredict
+                                                     ))
+      
+      Tform1 <- as.formula('average_length ~ . ')  # the formula to be used in models
+      
+    
+     plot(fit.predict)
+
+      
+
+```
+
+
+```{r}
+
+set.seed(1234) 
+rf <- buildModel(show_data2,method='randomForest', 
+                 training.per=c('2007-01-03','2014-12-30'), 
+                 ntree=1000, 
+                 importance=TRUE) 
+varImpPlot(rf@fitted.model, type = 1) # Type 2 shows ranking based on decrease in node impurity 
+
+
+
+```
+
+
+
+```{r}
+## ----size="scriptsize",message=FALSE,results="hide",tidy=FALSE,cache=FALSE----
+library(performanceEstimation)
+library(e1071)
+exp1 <- performanceEstimation(
+    PredTask(Tform1, show_data2, 'model1'),   
+    c(workflowVariants('timeseriesWF',wfID="svm", # creates a sliding or growing timeseries window
+               type="slide", relearn.step=90,
+               learner='svm',learner.pars=list(cost=c(1,5,10),gamma=c(0.001, 0.01, 0.1), epsilon=c(0.1,0.05)) ),
+      workflowVariants('timeseriesWF', wfID="nnet", # creates a sliding or growing timeseries window
+               type="slide", relearn.step=90, # 90 days slide
+               learner='nnet', learner.pars=list(size = c(1,5,10), decay = c(0.001, 0.01, 0.1) 
+                                                 , maxit = 1000, linout = TRUE, trace = FALSE )), 
+     workflowVariants('timeseriesWF', wfID="randomForest", # creates a sliding or growing timeseries window
+               type="slide", relearn.step=90, learner='randomForest', learner.pars=list(ntrees = c(100,500,1000,2500)))
+      ),
+    EstimationTask(metrics=c("theil","mae","mse", "rmse"), # Close to zero as possible.  Estimate of errors to base line (previous model)
+                   method=MonteCarlo(nReps=10,szTrain=0.5,szTest=0.25)))
+
+
+
+## ----size="tiny",cache=FALSE---------------------------------------------
+summary(exp1)   
+
+## ----size="scriptsize",fig.width=8,fig.height=8,out.width="0.5\\textwidth",cache=FALSE----
+plot(exp1)   
+
+
+```
+
+
+
+

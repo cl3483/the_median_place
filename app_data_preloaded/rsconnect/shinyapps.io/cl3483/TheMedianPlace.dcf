@@ -1,0 +1,13 @@
+name: themedianplace
+title: themedianplace
+username:
+account: cl3483
+server: shinyapps.io
+hostUrl: https://api.shinyapps.io/v1
+appId: 1202441
+bundleId: 2418734
+url: https://cl3483.shinyapps.io/themedianplace/
+when: 1568677900.46666
+asMultiple: FALSE
+asStatic: FALSE
+ignoredFiles: Model_Choice.Rmd

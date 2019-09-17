@@ -20,6 +20,7 @@ package.check <- lapply(packages, FUN = function(x) {
 #verify they are loaded
 search()
 
+
 ## function to plot a regression graph
 
 ggplotRegression <- function (fit) {
@@ -57,13 +58,8 @@ shinyServer(function(input, output, session) {
   prepareData <- reactive({
     
     
-    # install.packages('devtools') devtools::install_github("rstats-db/bigrquery")
-    # Use your project ID here
-    project <- "capstone-247602" # put your project ID here
-    # Example query - select copies of files with content containing "TODO"
-    sql <- "SELECT * FROM [combined_digital_linear.tbl_Joined_By_Series_Name_And_AirDate]"
-    # Execute the query and store the result
-    show_data <- query_exec(sql, project = project, useLegacySql = FALSE)
+    show_data <- readRDS("show_data.rds")
+    
     
     show_data$season_number_factored <- as.factor(show_data$season_number)
     
@@ -74,7 +70,7 @@ shinyServer(function(input, output, session) {
   
  
   # ######################################################
-  # Graphing Sections
+  # Get data by Show
   # 
   # ######################################################
   
@@ -106,6 +102,11 @@ shinyServer(function(input, output, session) {
 
   })
 
+  # ######################################################
+  # Get text for descritpions
+  # 
+  # ######################################################
+  
   prepareText <- reactive({
     
     model_desc <- read_csv("model_desc.csv")
@@ -114,10 +115,15 @@ shinyServer(function(input, output, session) {
     
   })
   
+  # ######################################################
+  # Do predictions
+  # 
+  # ######################################################
+  
   getPredict <- reactive({
     
     
-    show_data <- prepareData()
+    show_data <- getDataExplor()
     
     daystopredict <- 1:30
     
@@ -129,8 +135,13 @@ shinyServer(function(input, output, session) {
       
       daystopredict <- 1:30
       #show_data <- subset(show_data, show_data$series == "THIS IS US")
-      
+
+      ## Subset Data for modeling
       show_data2 <- show_data[, c("average_mins_viewed","season_number","episode_number","Imps")]
+      
+      ## Remove Outliers
+      outliers<-boxplot.stats(show_data2$Imps)$out
+      show_data2 <- show_data2[-which(show_data2$Imps %in% outliers),]
 
       getModel <- reactive({
         
@@ -183,9 +194,6 @@ shinyServer(function(input, output, session) {
         results <- getDataExplor()
     library(ggplot2)
     fit <- lm(average_mins_viewed ~ Imps, data = results)
-   # ggplot(results, aes(x = average_mins_viewed, y = Imps)) +
-    #  geom_point() + stat_summary(fun.data=mean_cl_normal) + 
-     # geom_smooth(method='lm') + 
     ggplotRegression(fit)
   })
   
@@ -196,7 +204,7 @@ shinyServer(function(input, output, session) {
     ggplot(data=results, aes(x=episode_number, y=average_mins_viewed, group=season_number_factored)) +
       geom_line(aes(color=season_number_factored ))+
       geom_point(aes(color=season_number_factored ))+ 
-      theme(legend.position="top")
+      theme(legend.position="top") 
   }) 
   
   output$graph3 <- renderPlot({
@@ -204,6 +212,12 @@ shinyServer(function(input, output, session) {
     plot(results)
   })
   
+  output$graph4 <- renderPlot({
+    results <- getDataExplor()
+    boxplot(results$Imps)
+  })
+  
+
   output$desc <- renderText({
     model_desc <- prepareText()
     filter(model_desc, model_desc$model == input$model) %>% pull(desc)
