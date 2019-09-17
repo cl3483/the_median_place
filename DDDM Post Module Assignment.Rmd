@@ -1,0 +1,128 @@
+---
+title: "Data Driven Decision Making - Post Module Assignment Analysis"
+author: "Natalia Fadeeva"
+date: "9/14/2019"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+```{r}
+library(bigrquery)
+library(tidyverse)
+library(DMwR2)
+#install.packages('devtools') 
+#devtools::install_github("rstats-db/bigrquery")
+```
+
+```{r}
+# Use your project ID here
+project <-"capstone-247602"
+# Example query - select copies of files with content containing "TODO"
+sql <- "SELECT * FROM [capstone-247602.combined_digital_linear.tbl_Joined_By_Series_Name_And_AirDate]"
+# Execute the query and store the result
+combined_data_by_ep <- query_exec(sql, project = project, useLegacySql = FALSE)
+```
+```{r}
+save(combined_data_by_ep, file = "combined_data_by_ep.csv")
+```
+```{r}
+#explore data
+summary(combined_data_by_ep)
+```
+```{r}
+#Identify outliers based on the average_min_viewed variable
+boxplot(combined_data_by_ep$average_mins_viewed)
+outliers<-boxplot.stats(combined_data_by_ep$average_mins_viewed)$out
+print(outliers)
+```
+
+```{r}
+#Find out which rows contain the 93 outlier values
+combined_data_by_ep[which(combined_data_by_ep$average_mins_viewed %in% outliers),]
+
+```
+
+```{r}
+#Remove the rows containing the outliers
+combined_data_by_ep2 <- combined_data_by_ep[-which(combined_data_by_ep$average_mins_viewed %in% outliers),]
+```
+
+```{r}
+#Remove 'All_Inds' column as it contains many incomplete values and records with incomplete values.
+combined_data_by_ep2<- subset(combined_data_by_ep2, select = -c(All_Inds ))
+combined_data_by_ep2<-combined_data_by_ep2[complete.cases(combined_data_by_ep2), ]
+```
+
+
+```{r}
+#Convert categorical variables from character to factor
+combined_data_by_ep2<- mutate_if(combined_data_by_ep2, is.character, as.factor)
+summary(combined_data_by_ep2)
+```
+```{r}
+boxplot(combined_data_by_ep2$average_mins_viewed)
+```
+
+```{r}
+#Correlations
+require(ggpubr)
+require(corrplot)
+library(dplyr)
+```
+```{r}
+cormatrix<-select(combined_data_by_ep2, average_mins_viewed, Imps, Median_Age, Median_Income, asset_length, episode_number, season_number)
+head(cormatrix)
+str(cormatrix)
+cor_1 <- round(cor(cormatrix), 2)
+cor_1
+```
+
+
+```{r}
+#Correlation coefficient of average_mins_viewed (digital) and imps(linear): 0.4886 
+cor.test(combined_data_by_ep2$average_mins_viewed, combined_data_by_ep2$Imps, method = c("pearson", "kendall", "spearman"))
+
+ggscatter(combined_data_by_ep2, x = "Imps", y = "average_mins_viewed",
+          add = "reg.line", conf.int = TRUE,
+          cor.coef = TRUE, cor.method = "pearson",
+          xlab = "Linear impressions", ylab = "Digital average mins viewed")
+```
+```{r}
+#Normality test for average_mins_viewed - Shapiro-Wilk test 
+shapiro.test(combined_data_by_ep2$average_mins_viewed)
+
+#Visual inspection of the Q-Q plots (quantile-quantile plots). Q-Q plot draws the correlation between a given sample and the theoretical normal distribution.
+ggqqplot(combined_data_by_ep2$average_mins_viewed, ylab = "digital average mins viewed")
+
+
+```
+```{r}
+##Normality test for Imps - Shapiro-Wilk test 
+shapiro.test(combined_data_by_ep2$Imps)
+
+#Visual inspection of the Q-Q plots (quantile-quantile plots) for Imps.
+ggqqplot(combined_data_by_ep2$Imps, ylab = "Lineaer Impressions")
+```
+```{r}
+res <- cor.test(combined_data_by_ep2$average_mins_viewed, combined_data_by_ep2$Imps, method = "pearson")
+res
+```
+```{r}
+corrplot(cor_1, method = "circle")
+```
+
+```{r}
+#The correlation coefficient of average_mins_viewed (digital) and Median_Income:0.4567
+cor.test(combined_data_by_ep2$average_mins_viewed, combined_data_by_ep2$Median_Income, method = c("pearson", "kendall", "spearman"))
+```
+
+
+```{r}
+#Run regression for average_min_viewed dependent variable
+#lm(formula = average_mins_viewed ~ Imps, data = combined_data_by_ep2)
+#lm(formula = average_mins_viewed ~ Median_Age, data = combined_data_by_ep2)
+```
+
