@@ -1,0 +1,159 @@
+---
+title: 'MSBA The Median Place Capstone - Digital Viewership Prediction'
+author: "Natalia Fadeeva "
+date: "January 9, 2020"
+output:
+  html_document:
+    df_print: paged
+---
+
+```{r Setup, echo=TRUE, eval=TRUE, results=TRUE, include=TRUE, warning=FALSE, message=FALSE}
+#Insall bigrquery to connect to Google Cloud
+library(bigrquery)
+```
+
+
+```{r Setup, echo=TRUE, eval=TRUE, results=TRUE, include=TRUE, warning=FALSE, message=FALSE}
+# Creating a vector of packages used within
+packages <- c('tidyverse',
+              'ggplot2',
+              'readr',
+              'xts',
+              'DMwR2',
+              'quantmod',
+              'TTR',
+              'performanceEstimation',
+              'nnet',
+              'e1071',
+              'earth',
+              'randomForest',
+              'kernlab',
+              'RQuantLib',
+              'MASS', 
+              'car'
+              )
+
+# Checking for package installations on the system and installing if not found
+if (length(setdiff(packages, rownames(installed.packages()))) > 0) {
+  install.packages(setdiff(packages, rownames(installed.packages())))  
+}
+
+# Including the packages for use
+for(package in packages){
+  library(package, character.only = TRUE)
+}
+```
+
+##Access combined NBC Digital Linear Data set
+```{r Access Combined Digital Linear Data, echo=TRUE, eval=TRUE, results=TRUE, include=TRUE, warning=FALSE, message=FALSE}
+# Use capstone project ID here
+project <-"capstone-247602"
+# Query table
+sql<- "SELECT * FROM [combined_digital_linear.tbl_title_matching_stage_3_FINAL]"
+comb_dat<-query_exec(sql, project = project, useLegacySql = FALSE)
+setwd("~/Capstone")
+save(comb_dat, file = "comb_data.csv")
+```
+
+
+```{r Access Combined Digital Linear Data, echo=TRUE, eval=TRUE, results=TRUE, include=TRUE, warning=FALSE, message=FALSE}
+#combined_digital_linear <- read_csv("~/Capstone/combined_digital_linear.csv")
+comb_dat<- mutate_if(comb_dat, is.character, as.factor)
+```
+##Detect Outliers
+```{r}
+## Identify Outliers for average_mins_viewed (Digital viewership)
+outliers_min<-boxplot.stats(comb_dat$average_mins_viewed)$out
+#print(outliers)
+#Find out which rows contain the outlier values for Average Mins Viewed
+comb_dat[which(comb_dat$average_mins_viewed %in% outliers_min),]
+```
+```{r}
+##Identify outliers for Imps (Linear Viewership)
+outliers_imps<-boxplot.stats(comb_dat$Imps)$out
+print(outliers_imps)
+#Find out which rows contain the outlier values for Imps
+comb_dat[which(comb_dat$Imps %in% outliers_imps),]
+```
+```{r}
+#Remove outliers from the dataset
+comb_dat2<- comb_dat[-which(comb_dat$average_mins_viewed %in% outliers_min),]
+comb_dat2<- comb_dat2[-which(comb_dat$Imps %in% outliers_imps),]
+
+```
+#Remove 'All_Inds' column as it contains many missing values 
+```{r}
+#comb_dat2<- subset(comb_dat2, select = -c(All_Inds ))
+comb_dat2<-comb_dat2[complete.cases(comb_dat2), ]
+view(comb_dat2)
+```
+##Analyze Digital Average Mins Viewed and Imps values
+```{r}
+summary(comb_dat2$average_mins_viewed)
+summary(comb_dat2$Imps)
+#boxplot(comb_dat2$average_mins_viewed)
+```
+
+#Determine correlations - added the following variables: dummy_weekday, dummy_10pm, dummy_9pm, dummy_8pm, dummy_genre_alt, dummy_genre_com, dummy_genre_dra, and quarter
+```{r}
+require(ggpubr)
+require(corrplot)
+library(dplyr)
+```
+```{r}
+cormatrix<-select(comb_dat2, average_mins_viewed, Imps, Median_Age, Median_Income, episode_number, Season, asset_length, dummy_weekday, dummy_10pm, dummy_9pm, dummy_8pm, dummy_genre_alt, dummy_genre_com, dummy_genre_dra, quarter)
+#head(cormatrix)
+#str(cormatrix)
+cor_1 <- round(cor(cormatrix), 2)
+#cor_1
+corrplot(cor_1, method = "circle")
+```
+```{r}
+#After increasing the number of variables from 7 to 15, the correlation coefficient of average_mins_viewed (digital) and imps(linear) went up from 0.49 to 0.61!
+
+cor.test(comb_dat2$average_mins_viewed, comb_dat2$Imps, method = c("pearson", "kendall", "spearman"))
+
+ggscatter(comb_dat2, x = "Imps", y = "average_mins_viewed",
+       add = "reg.line", conf.int = TRUE,
+       cor.coef = TRUE, cor.method = "pearson",
+       xlab = "Linear impressions", ylab = "Digital average mins viewed",
+       title = "Correlation of Linear TV Impessions with Digital Streaming Min")
+
+#ggplot(comb_dat2, aes(x=Imps, y=average_mins_viewed)) + geom_point() + scale_x_continuous #(limits=c(0,20000000)) + labs(x="Linear Impressions", y="Digital Ave Minutes Viewed", #title="Correlation of Linear TV Impessions with Digital Streaming Min")
+```
+```{r}
+## Run Multiple Linear Regression
+fit <- lm(average_mins_viewed ~ Imps + Median_Age + Median_Income + episode_number + Season+ asset_length + dummy_weekday + dummy_10pm + dummy_9pm + dummy_8pm + dummy_genre_alt + dummy_genre_com + dummy_genre_dra + quarter, data=comb_dat2)
+summary(fit)
+#coefficients(fit) # model coefficients
+#confint(fit, level=0.95) # CIs for model parameters
+#fitted(fit) # predicted values
+#residuals(fit) # residuals
+#anova(fit) # anova table
+#vcov(fit) # covariance matrix for model parameters
+#influence(fit) # regression diagnostics
+```
+##Variable Selection
+```{r}
+# We perform stepwise selection (forward, backward, both) using the stepAIC( ) function from the MASS package. 
+library(MASS)
+fit <- lm(average_mins_viewed ~ Imps + Median_Age + Median_Income + episode_number + Season+ asset_length + dummy_weekday + dummy_10pm + dummy_9pm + dummy_8pm + dummy_genre_alt + dummy_genre_com + dummy_genre_dra + quarter, data=comb_dat2)
+step <- stepAIC(fit, direction="both")
+step$anova # display results
+```
+# Variable selection using he leaps( ) function from the leaps package. In the following code nbest indicates the number of subsets of each size to report.
+```{r}
+# All Subsets Regression
+library(leaps)
+attach(comb_dat2)
+leaps<-regsubsets(average_mins_viewed ~ Imps + Median_Age + Median_Income + episode_number + Season+ asset_length + dummy_weekday + dummy_10pm + dummy_9pm + dummy_8pm + dummy_genre_alt + dummy_genre_com + dummy_genre_dra + quarter, data=comb_dat2,nbest=10)
+# view results
+summary(leaps)
+# plot a table of models showing variables in each model.
+# models are ordered by the selection statistic.
+plot(leaps,scale="r2")
+# plot statistic by subset size
+library(car)
+subsets(leaps, statistic="rsq")
+```
+
